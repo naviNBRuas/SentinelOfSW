@@ -1,0 +1,109 @@
+# ── Rust Build ──────────────────────────────────────────────
+target/
+**/*.rs.bk
+*.pdb
+
+# ── IDE & Editor ────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.~lock*
+*.iml
+.vscode/settings.json
+.idea/workspace.xml
+.idea/tasks.xml
+.idea/dataSources/
+.idea/dataSources.ids
+.idea/dictionaries/
+.idea/vcs.xml
+.idea/jsLibraryMappings.xml
+
+# ── OS Artifacts ────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ── Logs ────────────────────────────────────────────────────
+*.log
+*.log.*
+logs/
+
+# ── Temp Files ──────────────────────────────────────────────
+tmp/
+temp/
+*.tmp
+*.temp
+.cache/
+
+# ── Generated Reports (runtime output) ──────────────────────
+reports/
+report-*/
+output/
+
+# ── SQLite Session Database (auto-created at runtime) ───────
+sentinel_history.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# ── Runtime Configuration (contains secrets, never commit) ─
+settings.toml
+*.local.toml
+*.secret.toml
+
+# ── VPN Credentials (contains private keys & certs) ────────
+# Keep .gitkeep for the directory, ignore actual VPN configs
+vpn/*.ovpn
+vpn/*.conf
+vpn/*.key
+vpn/*.crt
+vpn/*.pem
+vpn/*.pfx
+vpn/*.p12
+vpn/!vpn/.gitkeep
+
+# ── Docker Artifacts ────────────────────────────────────────
+.docker/
+docker-compose.override.yml
+
+# ── Environment Files ───────────────────────────────────────
+.env
+.env.local
+.env.*.local
+*.env
+
+# ── Secrets ─────────────────────────────────────────────────
+*.pem
+*.key
+*.cert
+*.crt
+*.keystore
+*.jks
+*.secret
+credential*/
+secrets/
+
+# ── Python Virtual Environment (for helper scripts) ────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+env/
+.ropeproject/
+
+# ── OSINT / Tool Caches (downloaded/auto-generated) ────────
+wordlists/rockyou*
+*.txt.gz
+
+# ── Project-specific generated files ────────────────────────
+flag_for_ctf_test.txt

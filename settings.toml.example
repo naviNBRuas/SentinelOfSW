@@ -1,0 +1,64 @@
+# Sentinel Configuration
+# Copy to settings.toml in the working directory
+# All values shown are defaults; omit any section to use defaults
+
+[ports]
+# Default scan ports (used in Beginner/Professional mode)
+default = [21, 22, 23, 25, 53, 80, 81, 110, 111, 135, 139, 143, 161, 389, 443, 445,
+           465, 500, 513, 554, 587, 593, 636, 873, 990, 993, 995, 1433, 1521, 1723,
+           2049, 2082, 2083, 2181, 2222, 2375, 2376, 3000, 3128, 3268, 3269, 3306,
+           3389, 3478, 3632, 3690, 4000, 4040, 4444, 4500, 4848, 5000, 5432, 5555,
+           5601, 5666, 5672, 5800, 5900, 5901, 5984, 5985, 5986, 6000, 6379, 6443,
+           6697, 7000, 7001, 7002, 7070, 7777, 8000, 8008, 8443, 8500, 8600, 8649,
+           8834, 8880, 8888, 9000, 9001, 9002, 9042, 9050, 9060, 9080, 9090, 9091,
+           9100, 9200, 9300, 9418, 9443, 9999, 10000, 10050, 10051, 10443, 11000,
+           11211, 12345, 13337, 17000, 18100, 18200]
+
+# CTF mode ports (use ranges with {start = N, end = N})
+ctf = [{start = 1, end = 1024}, 1433, 1521, 2049, 2222, 2375, 2376, 2443, 3000,
+       3128, 3306, 3389, 3478, 3632, 3690, 4000, 4040, 4444, 4500, 4848, 6379,
+       6443, 6697, 7000, 7001, 7002, 7070, 7777, 8000, 8008, 8181, 8222, 8243,
+       8280, 8300, 8400, 8443, 8500, 8600, 8649, 8834, 8880, 8888, 9200, 9300,
+       9418, 9443, 9999, 10000, 10050, 10051, 10443, 11000, 11211, 12345, 13337,
+       27017, 27018, 27019, 31337, 32764, 42000, 42001,
+       {start = 5000, end = 6000}, {start = 8080, end = 8090},
+       {start = 9000, end = 9100}, {start = 16000, end = 16100},
+       {start = 17000, end = 17001}, {start = 18080, end = 18200},
+       {start = 32771, end = 32779}, {start = 43000, end = 43010},
+       {start = 49152, end = 49156}]
+
+# Quick mode ports
+quick = [21, 22, 23, 25, 53, 80, 110, 111, 135, 139, 143, 389, 443, 445, 993,
+         995, 1433, 1521, 2049, 3306, 3389, 5432, 5900, 5985, 5986, 6379, 8080,
+         8443, 27017]
+
+[timeouts]
+connect_ms = 100
+ctf_connect_ms = 80
+http_secs = 3
+dns_secs = 3
+banner_secs = 2
+
+[concurrency]
+port_scan_batch = 10
+port_scan_ctf_batch = 20
+dns_semaphore = 10
+web_semaphore = 15
+
+[scan]
+report_path = "reports"
+user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+osint_user_agent = "Sentinel OSINT/1.0"
+
+# HTTP proxy for web/OSINT requests (empty = use system proxy or direct)
+# reqwest also respects HTTP_PROXY and HTTPS_PROXY env vars by default
+proxy_url = ""
+
+# Or for Burp/ZAP:
+# proxy_url = "http://127.0.0.1:8080"
+
+# Optional: external wordlist files (one entry per line)
+# If empty or file not found, built-in wordlists are used
+wordlist_subdomains_file = ""
+wordlist_directories_file = ""
+wordlist_ctf_files_file = ""
