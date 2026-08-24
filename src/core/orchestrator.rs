@@ -246,7 +246,6 @@ impl WorkflowOrchestrator {
         for idx in self.graph.node_indices() {
             if self.graph[idx].name == name {
                 self.graph[idx].status = status;
-                return;
             }
         }
     }
@@ -327,6 +326,25 @@ mod tests {
         for idx in o.graph.node_indices() {
             assert_eq!(o.graph[idx].status, TaskStatus::Pending);
         }
+    }
+
+    #[test]
+    fn test_update_task_by_name_updates_all_duplicates() {
+        let mut o = make_orchestrator();
+        o.add_task("port_scan");
+        o.add_task("recon");
+        o.add_task("port_scan");
+        o.update_task_by_name("port_scan", TaskStatus::Completed);
+        let dup_statuses: Vec<TaskStatus> = o
+            .status_summary()
+            .into_iter()
+            .filter(|(name, _)| name == "port_scan")
+            .map(|(_, status)| status)
+            .collect();
+        assert_eq!(dup_statuses.len(), 2);
+        assert!(dup_statuses.iter().all(|s| *s == TaskStatus::Completed));
+        // unrelated task untouched
+        assert_eq!(o.task_count_by_status(), (1, 0, 2, 0));
     }
 
     #[test]
