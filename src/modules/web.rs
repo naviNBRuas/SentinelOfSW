@@ -72,6 +72,15 @@ fn build_client() -> Client {
         .expect("Failed to build reqwest client")
 }
 
+fn extract_disallowed_paths(body: &str) -> Vec<String> {
+    body.lines()
+        .filter(|l| l.to_lowercase().starts_with("disallow:"))
+        .filter_map(|l| l.split_once(':').map(|(_, v)| v))
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect()
+}
+
 pub struct WebEnum;
 
 #[async_trait]
@@ -138,13 +147,7 @@ impl Module for WebEnum {
             match client.get(&robots_url).send().await {
                 Ok(resp) if resp.status().as_u16() == 200 => {
                     let body = resp.text().await.unwrap_or_default();
-                    let disallowed: Vec<String> = body
-                        .lines()
-                        .filter(|l| l.to_lowercase().starts_with("disallow:"))
-                        .filter_map(|l| l.split(':').nth(1))
-                        .map(|s| s.trim().trim_matches(' ').to_string())
-                        .filter(|s| !s.is_empty())
-                        .collect();
+                    let disallowed: Vec<String> = extract_disallowed_paths(&body);
                     let _ = tx.send(format!("[Web Enum] robots.txt found with {} disallowed paths", disallowed.len())).await;
                     findings.push(
                         Finding::new(target, "web", "Robots.txt Discovered",
@@ -594,5 +597,37 @@ impl Module for WebEnum {
 
         let _ = tx.send(format!("[Web Enum] Harvest complete. {} secret finding(s).", findings.len())).await;
         Ok(findings)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_disallowed_paths_preserves_colons() {
+        let body = "User-agent: *\nDisallow: /search?url=http://evil.com\nAllow: /\n";
+        let paths = extract_disallowed_paths(body);
+        assert_eq!(paths, vec!["/search?url=http://evil.com"]);
+    }
+
+    #[test]
+    fn test_extract_disallowed_paths_basic_and_case_insensitive() {
+        let body = "User-agent: *\ndisallow: /admin\nDisallow:/secret\nDisallow: /backup/\n";
+        let paths = extract_disallowed_paths(body);
+        assert_eq!(paths, vec!["/admin", "/secret", "/backup/"]);
+    }
+
+    #[test]
+    fn test_extract_disallowed_paths_skips_empty_values() {
+        let body = "Disallow:\nDisallow: \nDisallow: /real\n";
+        let paths = extract_disallowed_paths(body);
+        assert_eq!(paths, vec!["/real"]);
+    }
+
+    #[test]
+    fn test_extract_disallowed_paths_ignores_non_disallow_lines() {
+        let body = "User-agent: Googlebot\nCrawl-delay: 10\nSitemap: https://x/sitemap.xml\n";
+        assert!(extract_disallowed_paths(body).is_empty());
     }
 }
