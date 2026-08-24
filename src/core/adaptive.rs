@@ -207,6 +207,26 @@ fn harvest_url_from_evidence(evidence: &[String]) -> Option<String> {
     None
 }
 
+fn clean_env_value(val: &str) -> &str {
+    let val = val.trim();
+    if let Some(inner) = val.strip_prefix('"') {
+        return match inner.find('"') {
+            Some(end) => &inner[..end],
+            None => inner,
+        };
+    }
+    if let Some(inner) = val.strip_prefix('\'') {
+        return match inner.find('\'') {
+            Some(end) => &inner[..end],
+            None => inner,
+        };
+    }
+    match val.find(" #") {
+        Some(i) => val[..i].trim_end(),
+        None => val,
+    }
+}
+
 /// Parse a `.env` body for credential-looking `KEY=VALUE` pairs. Pairs whose key
 /// looks like a username are paired with the nearest password-looking value.
 pub fn parse_env_secrets(body: &str) -> Vec<(String, String, String)> {
@@ -221,7 +241,7 @@ pub fn parse_env_secrets(body: &str) -> Vec<(String, String, String)> {
         let line = line.strip_prefix("export ").unwrap_or(line);
         let Some((key, val)) = line.split_once('=') else { continue };
         let key = key.trim().trim_matches('"');
-        let val = val.trim().trim_matches('"').trim_matches('\'');
+        let val = clean_env_value(val);
         if val.is_empty() {
             continue;
         }
@@ -406,6 +426,17 @@ mod tests {
         assert!(got.iter().any(|(k, _, p)| k == "API_TOKEN" && p == "abc123"));
         // PORT is not a secret; EMPTY has no value.
         assert!(!got.iter().any(|(k, _, _)| k == "PORT" || k == "EMPTY"));
+    }
+
+    #[test]
+    fn test_parse_env_secrets_inline_comments_and_quotes() {
+        let body = "DB_PASS=\"hunter2\" # prod\nTOKEN=abc123 # rotate me\nAPI_KEY=#ff00ff\nPASS_HASH=a#b\nSECRET_KEY='p@ss word'\n";
+        let got = parse_env_secrets(body);
+        assert!(got.iter().any(|(k, _, p)| k == "DB_PASS" && p == "hunter2"));
+        assert!(got.iter().any(|(k, _, p)| k == "TOKEN" && p == "abc123"));
+        assert!(got.iter().any(|(k, _, p)| k == "API_KEY" && p == "#ff00ff"));
+        assert!(got.iter().any(|(k, _, p)| k == "PASS_HASH" && p == "a#b"));
+        assert!(got.iter().any(|(k, _, p)| k == "SECRET_KEY" && p == "p@ss word"));
     }
 
     #[test]
