@@ -226,7 +226,6 @@ impl PortScanner {
         for &port in ports {
             let sem = Arc::clone(&sem);
             let target = target.to_string();
-            let connect_timeout = connect_timeout;
 
             handles.push(tokio::spawn(async move {
                 let _permit = sem.acquire().await.map_err(|_| ()).ok()?;

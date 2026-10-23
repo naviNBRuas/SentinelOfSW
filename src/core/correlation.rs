@@ -106,8 +106,7 @@ impl CorrelationEngine {
         // Path 6: Web + Exploit findings → Targeted Exploitation
         if has_web && !exploit_findings.is_empty() {
             let cve_refs: Vec<String> = exploit_findings.iter()
-                .filter(|t| t.contains("CVE"))
-                .map(|t| t.clone())
+                .filter(|t| t.contains("CVE")).cloned()
                 .collect();
             if !cve_refs.is_empty() {
                 let mut p = AttackPath::new(
@@ -222,9 +221,9 @@ impl CorrelationEngine {
         // Penalize if confidence is very low (< 0.3) — unreliable findings should not boost paths
         let reliability_penalty = if avg_confidence < 0.3 { avg_confidence * 0.5 } else { 0.0 };
 
-        let adjustment = (evidence_weight + cred_weight + exploit_weight - reliability_penalty)
-            .max(0.0)
-            .min(0.25);
+        let adjustment = evidence_weight + cred_weight + exploit_weight - reliability_penalty;
+        // Preserve the previous max/min behavior: NaN contributes no boost.
+        let adjustment = if adjustment.is_nan() { 0.0 } else { adjustment.clamp(0.0, 0.25) };
         path.likelihood = (path.likelihood + adjustment).min(0.99);
     }
 
@@ -236,7 +235,7 @@ impl CorrelationEngine {
         map
     }
 
-    fn get_finding_titles<'a>(by_module: &HashMap<String, Vec<&'a Finding>>, module: &str) -> Vec<String> {
+    fn get_finding_titles(by_module: &HashMap<String, Vec<&Finding>>, module: &str) -> Vec<String> {
         by_module.get(module)
             .map(|findings| findings.iter().map(|f| f.title.clone()).collect())
             .unwrap_or_default()
@@ -341,6 +340,22 @@ mod tests {
         CorrelationEngine::score_path(&mut path, &store);
         assert!(path.likelihood > 0.5);
         assert!(path.likelihood <= 0.99);
+    }
+
+    #[test]
+    fn test_score_path_preserves_non_finite_confidence_behavior() {
+        for (confidence, expected) in [
+            (f32::NAN, 0.5),
+            (f32::INFINITY, 0.5),
+            (f32::NEG_INFINITY, 0.5),
+        ] {
+            let mut store = make_store();
+            store.add(Finding::new("test.local", "creds", "Fixture", "local fixture", Severity::Info)
+                .with_confidence(confidence));
+            let mut path = AttackPath::new("Fixture", "local fixture", 0.5, Severity::High);
+            CorrelationEngine::score_path(&mut path, &store);
+            assert_eq!(path.likelihood, expected, "confidence: {confidence}");
+        }
     }
 
     #[test]

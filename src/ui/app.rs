@@ -269,7 +269,7 @@ impl App {
                 },
                 Err(_) => "VPN ...".into(),
             }
-        }).unwrap_or_else(|| String::new())
+        }).unwrap_or_default()
     }
 
     pub fn docker_status_str(&self) -> String {

@@ -258,28 +258,22 @@ impl Module for SmbEnum {
                                                             let _ = tx.send("[SMB] Enumerating shares via TreeConnect...".into()).await;
                                                             for share in COMMON_SHARES {
                                                                 let tc_pkt = build_tree_connect(session_id, share);
-                                                                match timeout(Settings::global().banner_timeout(), stream.write_all(&tc_pkt)).await {
-                                                                    Ok(Ok(_)) => {
-                                                                        let mut tcbuf = vec![0u8; 1024];
-                                                                        match timeout(Settings::global().banner_timeout(), stream.read(&mut tcbuf)).await {
-                                                                            Ok(Ok(tn)) => {
-                                                                                tcbuf.truncate(tn);
-                                                                                if let Some(tree_id) = parse_tree_connect(&tcbuf) {
-                                                                                    let _ = tx.send(format!("[SMB] Accessible share: {} (TreeId: 0x{:08x})", share, tree_id)).await;
-                                                                                    findings.push(
-                                                                                        Finding::new(target, "smb",
-                                                                                            &format!("SMB Accessible Share: {}", share),
-                                                                                            &format!("Share '{}' is accessible via null session on {}. May contain sensitive data.", share, target),
-                                                                                            if share.ends_with('$') { Severity::Medium } else { Severity::High },
-                                                                                        ).with_confidence(0.9)
-                                                                                        .with_evidence(vec![format!("TreeConnect to {} succeeded (TreeId: 0x{:08x})", share, tree_id)]),
-                                                                                    );
-                                                                                }
-                                                                            }
-                                                                            _ => {}
+                                                                if let Ok(Ok(_)) = timeout(Settings::global().banner_timeout(), stream.write_all(&tc_pkt)).await {
+                                                                    let mut tcbuf = vec![0u8; 1024];
+                                                                    if let Ok(Ok(tn)) = timeout(Settings::global().banner_timeout(), stream.read(&mut tcbuf)).await {
+                                                                        tcbuf.truncate(tn);
+                                                                        if let Some(tree_id) = parse_tree_connect(&tcbuf) {
+                                                                            let _ = tx.send(format!("[SMB] Accessible share: {} (TreeId: 0x{:08x})", share, tree_id)).await;
+                                                                            findings.push(
+                                                                                Finding::new(target, "smb",
+                                                                                    &format!("SMB Accessible Share: {}", share),
+                                                                                    &format!("Share '{}' is accessible via null session on {}. May contain sensitive data.", share, target),
+                                                                                    if share.ends_with('$') { Severity::Medium } else { Severity::High },
+                                                                                ).with_confidence(0.9)
+                                                                                .with_evidence(vec![format!("TreeConnect to {} succeeded (TreeId: 0x{:08x})", share, tree_id)]),
+                                                                            );
                                                                         }
                                                                     }
-                                                                    _ => {}
                                                                 }
                                                             }
                                                         } else {

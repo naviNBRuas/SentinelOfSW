@@ -24,7 +24,7 @@ impl KnowledgeBase {
             references: vec![
                 "https://en.wikipedia.org/wiki/List_of_TCP_and_UDP_port_numbers".into(),
             ],
-            mitigation: format!("Close unnecessary ports. For required services, ensure they are properly configured, patched, and behind a firewall if possible."),
+            mitigation: "Close unnecessary ports. For required services, ensure they are properly configured, patched, and behind a firewall if possible.".to_string(),
         }
     }
 
@@ -61,7 +61,7 @@ impl KnowledgeBase {
                 format!("https://nvd.nist.gov/vuln/detail/{}", cve_id),
                 "https://www.exploit-db.com/".into(),
             ],
-            mitigation: format!("Update to the latest patched version. If not possible, implement virtual patching or WAF rules."),
+            mitigation: "Update to the latest patched version. If not possible, implement virtual patching or WAF rules.".to_string(),
         }
     }
 

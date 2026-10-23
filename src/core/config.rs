@@ -8,7 +8,7 @@ use std::sync::{Mutex, OnceLock};
 /// Runtime CLI overrides that take precedence over settings.toml
 pub static RUNTIME_OVERRIDES: OnceLock<Mutex<RuntimeOverrides>> = OnceLock::new();
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct RuntimeOverrides {
     pub exclude_ports: Vec<u16>,
     pub stealth_mode: bool,
@@ -17,20 +17,6 @@ pub struct RuntimeOverrides {
     pub threads: Option<usize>,
     pub rate_limit: Option<u64>,
     pub timeout: Option<u64>,
-}
-
-impl Default for RuntimeOverrides {
-    fn default() -> Self {
-        Self {
-            exclude_ports: Vec::new(),
-            stealth_mode: false,
-            no_report: false,
-            json_mode: false,
-            threads: None,
-            rate_limit: None,
-            timeout: None,
-        }
-    }
 }
 
 impl RuntimeOverrides {
@@ -43,7 +29,7 @@ impl RuntimeOverrides {
     }
 
     pub fn update<F: FnOnce(&mut RuntimeOverrides)>(f: F) {
-        f(&mut *RUNTIME_OVERRIDES.get_or_init(|| Mutex::new(RuntimeOverrides::default())).lock().unwrap());
+        f(&mut RUNTIME_OVERRIDES.get_or_init(|| Mutex::new(RuntimeOverrides::default())).lock().unwrap());
     }
 }
 

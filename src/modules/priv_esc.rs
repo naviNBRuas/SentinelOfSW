@@ -109,7 +109,7 @@ impl Module for PrivEsc {
                      4. Dashboard endpoint",
                     Severity::Critical,
                 ).with_confidence(0.8)
-                .with_evidence(vec![format!("Kubernetes port 6443 or 10250 detected")]),
+                .with_evidence(vec!["Kubernetes port 6443 or 10250 detected".to_string()]),
             );
         }
 

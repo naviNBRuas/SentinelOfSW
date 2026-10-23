@@ -78,7 +78,7 @@ impl Module for OsintModule {
             }
         }
 
-        let search_domain = if is_ip { target_base } else { target_base };
+        let search_domain = target_base;
 
         // 1b. Certificate Transparency (crt.sh) — works for both domains and IPs
         let _ = tx.send(format!("[OSINT] Querying crt.sh for {}", search_domain)).await;
@@ -140,36 +140,30 @@ impl Module for OsintModule {
             }
 
             // TXT records (SPF, DKIM, DMARC)
-            match resolver.txt_lookup(target_base).await {
-                Ok(response) => {
-                    let txts: Vec<String> = response.iter().map(|txt| txt.to_string()).collect();
-                    if !txts.is_empty() {
-                        let _ = tx.send(format!("[OSINT] TXT records: {}", txts.len())).await;
-                        let spf = txts.iter().find(|t| t.contains("v=spf1"));
-                        let has_dkim = txts.iter().any(|t| t.contains("v=DKIM1") || t.contains("o=~") || t.contains("p="));
-                        if spf.is_some() || has_dkim {
-                            findings.push(Finding::new(target, "osint", "Email Security (SPF/DKIM/DMARC) Records",
-                                &format!("Found email security DNS records for {}. TXT count: {}", target_base, txts.len()),
-                                Severity::Info,
-                            ).with_confidence(0.9).with_evidence(txts.iter().take(5).cloned().collect()));
-                        }
+            if let Ok(response) = resolver.txt_lookup(target_base).await {
+                let txts: Vec<String> = response.iter().map(|txt| txt.to_string()).collect();
+                if !txts.is_empty() {
+                    let _ = tx.send(format!("[OSINT] TXT records: {}", txts.len())).await;
+                    let spf = txts.iter().find(|t| t.contains("v=spf1"));
+                    let has_dkim = txts.iter().any(|t| t.contains("v=DKIM1") || t.contains("o=~") || t.contains("p="));
+                    if spf.is_some() || has_dkim {
+                        findings.push(Finding::new(target, "osint", "Email Security (SPF/DKIM/DMARC) Records",
+                            &format!("Found email security DNS records for {}. TXT count: {}", target_base, txts.len()),
+                            Severity::Info,
+                        ).with_confidence(0.9).with_evidence(txts.iter().take(5).cloned().collect()));
                     }
                 }
-                Err(_) => {}
             }
 
             // SOA record
-            match resolver.soa_lookup(target_base).await {
-                Ok(response) => {
-                    if let Some(soa) = response.iter().next() {
-                        let _ = tx.send(format!("[OSINT] SOA: {} (admin: {})", soa.mname(), soa.rname())).await;
-                    }
+            if let Ok(response) = resolver.soa_lookup(target_base).await {
+                if let Some(soa) = response.iter().next() {
+                    let _ = tx.send(format!("[OSINT] SOA: {} (admin: {})", soa.mname(), soa.rname())).await;
                 }
-                Err(_) => {}
             }
 
             // 3. Subdomain brute-force
-            let subdomains = Settings::global().subdomain_wordlist(&SUBDOMAIN_WORDLIST)
+            let subdomains = Settings::global().subdomain_wordlist(SUBDOMAIN_WORDLIST)
                 .unwrap_or_else(|_| SUBDOMAIN_WORDLIST.iter().map(|s| s.to_string()).collect());
             let _ = tx.send(format!("[OSINT] Brute-forcing {} subdomains...", subdomains.len())).await;
             let mut subdomain_count = 0;
@@ -178,21 +172,18 @@ impl Module for OsintModule {
                 let fqdn = format!("{}.{}", sub, target_base);
                 let lookup_addr = format!("{}:0", fqdn);
                 let addrs = tokio::time::timeout(Settings::global().dns_timeout(), lookup_host(&lookup_addr)).await;
-                match addrs {
-                    Ok(Ok(addrs)) => {
-                        let ips: Vec<String> = addrs.map(|sa| sa.ip().to_string()).collect();
-                        if !ips.is_empty() {
-                            subdomain_count += 1;
-                            let _ = tx.send(format!("[OSINT] Subdomain: {} → {}", fqdn, ips.join(", "))).await;
-                            if subdomain_count <= 5 {
-                                findings.push(Finding::new(target, "osint", &format!("Subdomain: {}", fqdn),
-                                    &format!("Discovered {} resolving to {}.", fqdn, ips.join(", ")),
-                                    Severity::Info,
-                                ).with_confidence(0.95).with_evidence(vec![format!("{} → {}", fqdn, ips.join(", "))]));
-                            }
+                if let Ok(Ok(addrs)) = addrs {
+                    let ips: Vec<String> = addrs.map(|sa| sa.ip().to_string()).collect();
+                    if !ips.is_empty() {
+                        subdomain_count += 1;
+                        let _ = tx.send(format!("[OSINT] Subdomain: {} → {}", fqdn, ips.join(", "))).await;
+                        if subdomain_count <= 5 {
+                            findings.push(Finding::new(target, "osint", &format!("Subdomain: {}", fqdn),
+                                &format!("Discovered {} resolving to {}.", fqdn, ips.join(", ")),
+                                Severity::Info,
+                            ).with_confidence(0.95).with_evidence(vec![format!("{} → {}", fqdn, ips.join(", "))]));
                         }
                     }
-                    _ => {}
                 }
             }
 

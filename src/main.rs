@@ -28,7 +28,7 @@ use crate::ui::{App, AppPhase, SetupField, Tab};
 #[derive(Parser, Debug)]
 #[command(
     name = "sentinel",
-    version = "2.0",
+    version,
     about = "Terminal-Native Offensive Security Workbench",
     long_about = "\
 SENTINEL - Terminal-Native Offensive Security Workbench
@@ -215,7 +215,7 @@ async fn main() -> anyhow::Result<()> {
                 println!("No past sessions found.");
             } else {
                 println!("Past Sessions:");
-                println!("  {:<4} {:<20} {:<20} {:<10} {:<12} {}", "ID", "Target", "Timestamp", "Mode", "Findings", "Paths");
+                println!("  {:<4} {:<20} {:<20} {:<10} {:<12} Paths", "ID", "Target", "Timestamp", "Mode", "Findings");
                 println!("  {:-<4} {:-<20} {:-<20} {:-<10} {:-<12} {:-<12}", "", "", "", "", "", "");
                 for s in &sessions {
                     println!("  {:<4} {:<20} {:<20} {:<10} {:<12} {}", s.id, s.target, s.started_at, s.mode, s.total_findings, s.attack_paths);
@@ -386,7 +386,7 @@ async fn main() -> anyhow::Result<()> {
             }
         }
     } else {
-        run_tui(target_str, mode, vpn_mgr.clone()).await?;
+        run_tui(target_str, mode, vpn_mgr.clone(), cli.output_dir.as_deref()).await?;
     }
 
     // Cleanup VPN
@@ -407,7 +407,7 @@ fn print_vpn_list() {
         return;
     }
     eprintln!("Available VPN configs:");
-    eprintln!("  {:<20} {:<10} {}", "Name", "Type", "Path");
+    eprintln!("  {:<20} {:<10} Path", "Name", "Type");
     eprintln!("  {:-<20} {:-<10} {:-<30}", "", "", "");
     for config in &configs {
         let vpn_type = match config.vpn_type {
@@ -490,14 +490,15 @@ async fn run_headless(target: &str, mode: WorkflowMode, _vpn: Option<Arc<VpnMana
                 writeln!(out_print(), "{}", clean).ok();
             }
         }
-        let o = orch.lock().unwrap();
-        let (p, r, c, f) = o.task_count_by_status();
+        let (p, r, c, f) = {
+            let o = orch.lock().unwrap();
+            o.task_count_by_status()
+        };
         let total = p + r + c + f;
         if c + f != last_count || c + f == total {
             writeln!(out_print(), "  Tasks: {} pending, {} running, {} done, {} failed ({} total)", p, r, c + f, f, total).ok();
             last_count = c + f;
         }
-        drop(o);
         if c + f == total && total > 0 {
             let o = orch.lock().unwrap();
             if !o.findings.findings.is_empty() || !o.findings.attack_paths.is_empty() || !o.open_ports.is_empty() {
@@ -553,7 +554,12 @@ async fn run_headless(target: &str, mode: WorkflowMode, _vpn: Option<Arc<VpnMana
     Ok(Some(store))
 }
 
-async fn run_tui(target: &str, mode: WorkflowMode, vpn: Option<Arc<VpnManager>>) -> anyhow::Result<()> {
+fn tui_report_path(output_dir: Option<&str>, configured_default: &str) -> String {
+    output_dir.unwrap_or(configured_default).to_string()
+}
+
+async fn run_tui(target: &str, mode: WorkflowMode, vpn: Option<Arc<VpnManager>>, output_dir: Option<&str>) -> anyhow::Result<()> {
+    let report_path = tui_report_path(output_dir, Settings::global().report_path());
     let has_target = !target.is_empty();
     let app = Arc::new(Mutex::new(App::new(target, mode, vpn)));
 
@@ -575,7 +581,7 @@ async fn run_tui(target: &str, mode: WorkflowMode, vpn: Option<Arc<VpnManager>>)
         let tx_log = tx.clone();
         let target_str = target.to_string();
         let run_mode = mode;
-        let tui_report_path = Settings::global().report_path().to_string();
+        let tui_report_path = report_path.clone();
         // Init orchestrator
         {
             let app_guard = app_clone.lock().unwrap();
@@ -662,7 +668,7 @@ async fn run_tui(target: &str, mode: WorkflowMode, vpn: Option<Arc<VpnManager>>)
                                     let app_clone = Arc::clone(&app);
                                     let tx_log = tx.clone();
                                     let run_mode = app_guard.mode;
-                                    let tui_report_path = Settings::global().report_path().to_string();
+                                    let tui_report_path = report_path.clone();
                                     let tx_done = tx_log.clone();
                                     let handle = tokio::spawn(async move {
                                         run_scanner(&target_input, run_mode, tx_log, {
@@ -679,10 +685,9 @@ async fn run_tui(target: &str, mode: WorkflowMode, vpn: Option<Arc<VpnManager>>)
                                     app_guard.push_target_char(c);
                                 }
                             }
-                            KeyCode::Backspace => {
-                                if app_guard.setup_field == SetupField::Target {
-                                    app_guard.pop_target_char();
-                                }
+                            KeyCode::Backspace
+                                if app_guard.setup_field == SetupField::Target => {
+                                app_guard.pop_target_char();
                             }
                             _ => {}
                         }
@@ -923,7 +928,7 @@ async fn run_scanner(target: &str, mode: WorkflowMode, tx: mpsc::Sender<String>,
         let report_result = {
             if let Ok(o) = orch.lock() {
                 let mode_str = mode.to_string();
-                match EvidenceManager::with_path(target, &report_path) {
+                match EvidenceManager::with_path(target, report_path) {
                     Ok(ev_mgr) => ev_mgr.generate_reports(&o.findings, &mode_str).map(|_| "Reports saved".to_string()),
                     Err(e) => Err(e),
                 }
@@ -969,9 +974,9 @@ fn strip_ansi(s: String) -> String {
     while let Some(c) = chars.next() {
         if c == '\x1b' {
             while let Some(&next) = chars.peek() {
-                if next == '[' || (next >= '0' && next <= '?') || next == ';' {
+                if next == '[' || ('0'..='?').contains(&next) || next == ';' {
                     chars.next();
-                } else if (next >= '@' && next <= '~') || next == 'm' {
+                } else if ('@'..='~').contains(&next) || next == 'm' {
                     chars.next();
                     break;
                 } else {
@@ -983,4 +988,45 @@ fn strip_ansi(s: String) -> String {
         }
     }
     result
+}
+
+#[cfg(test)]
+mod cli_tests {
+    use super::*;
+
+    #[test]
+    fn explicit_report_directory_survives_immediate_tui_options() {
+        let cli = Cli::try_parse_from(["sentinel", "example.test", "--output-dir", "custom reports"]).unwrap();
+        assert_eq!(tui_report_path(cli.output_dir.as_deref(), "configured-reports"), "custom reports");
+        assert_eq!(cli.target.as_deref(), Some("example.test"));
+    }
+
+    #[test]
+    fn explicit_report_directory_survives_setup_tui_options() {
+        let cli = Cli::try_parse_from(["sentinel", "--output-dir", "setup-reports"]).unwrap();
+        assert!(cli.target.is_none());
+        assert_eq!(tui_report_path(cli.output_dir.as_deref(), "configured-reports"), "setup-reports");
+    }
+
+    #[test]
+    fn omitted_report_directory_keeps_configured_default() {
+        for args in [vec!["sentinel"], vec!["sentinel", "example.test"]] {
+            let cli = Cli::try_parse_from(args).unwrap();
+            assert_eq!(tui_report_path(cli.output_dir.as_deref(), "configured-reports"), "configured-reports");
+        }
+    }
+
+    #[test]
+    fn headless_report_directory_remains_explicit() {
+        let cli = Cli::try_parse_from(["sentinel", "--headless", "example.test", "--output-dir", "headless-reports"]).unwrap();
+        assert!(cli.headless);
+        assert_eq!(cli.output_dir.as_deref(), Some("headless-reports"));
+    }
+
+    #[test]
+    fn version_output_uses_cargo_package_metadata() {
+        let error = Cli::try_parse_from(["sentinel", "--version"]).unwrap_err();
+        assert_eq!(error.kind(), clap::error::ErrorKind::DisplayVersion);
+        assert_eq!(error.to_string(), format!("sentinel {}\n", env!("CARGO_PKG_VERSION")));
+    }
 }

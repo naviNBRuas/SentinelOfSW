@@ -85,13 +85,13 @@ impl EvidenceManager {
 
     pub(crate) fn render_markdown(&self, report: &Report) -> String {
         let mut md = String::new();
-        md.push_str(&format!("# Sentinel Security Report\n\n"));
+        md.push_str("# Sentinel Security Report\n\n");
         md.push_str(&format!("**Target:** {}\n", report.target));
         md.push_str(&format!("**Date:** {}\n", report.timestamp));
         md.push_str(&format!("**Mode:** {}\n\n", report.mode));
 
         md.push_str("## Executive Summary\n\n");
-        md.push_str(&format!("| Severity | Count |\n|----------|-------|\n"));
+        md.push_str("| Severity | Count |\n|----------|-------|\n");
         md.push_str(&format!("| Critical | {} |\n", report.scan_summary.critical_count));
         md.push_str(&format!("| High | {} |\n", report.scan_summary.high_count));
         md.push_str(&format!("| Medium | {} |\n", report.scan_summary.medium_count));
@@ -110,7 +110,7 @@ impl EvidenceManager {
                 for step in &path.steps {
                     md.push_str(&format!("  {}. {} ({})\n", step.id, step.description, step.technique));
                 }
-                md.push_str("\n");
+                md.push('\n');
             }
         }
 
@@ -134,7 +134,7 @@ impl EvidenceManager {
                     md.push_str(&format!("  - `{}`\n", ev));
                 }
             }
-            md.push_str("\n");
+            md.push('\n');
         }
         md
     }
@@ -156,7 +156,7 @@ impl EvidenceManager {
         html.push_str("tr:nth-child(even){background:#f9f9f9}");
         html.push_str("pre{background:#f4f4f4;padding:1em;overflow-x:auto}");
         html.push_str("</style></head><body>");
-        html.push_str(&format!("<h1>Sentinel Security Report</h1>"));
+        html.push_str("<h1>Sentinel Security Report</h1>");
         html.push_str(&format!("<p><strong>Target:</strong> {}<br>", report.target));
         html.push_str(&format!("<strong>Date:</strong> {}<br>", report.timestamp));
         html.push_str(&format!("<strong>Mode:</strong> {}</p>", report.mode));

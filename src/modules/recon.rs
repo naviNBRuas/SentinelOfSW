@@ -151,7 +151,7 @@ async fn attempt_axfr(domain: &str) -> Result<Option<Vec<String>>, anyhow::Error
                                             format!("A {}", std::net::Ipv4Addr::new(resp[pos], resp[pos+1], resp[pos+2], resp[pos+3]))
                                         } else if rdlength == 16 {
                                             // simplified IPv6
-                                            format!("AAAA (IPv6)")
+                                            "AAAA (IPv6)".to_string()
                                         } else { format!("TYPE{}", rtype) }
                                     }
                                     2 => { // NS
@@ -216,7 +216,7 @@ impl Module for DnsRecon {
         let mut findings = Vec::new();
 
         if IpAddr::from_str(target_base).is_ok() {
-            let _ = tx.send(format!("[DNS Recon] Target is an IP address, skipping subdomain enumeration")).await;
+            let _ = tx.send("[DNS Recon] Target is an IP address, skipping subdomain enumeration".to_string()).await;
             findings.push(
                 Finding::new(
                     target,
@@ -325,49 +325,43 @@ impl Module for DnsRecon {
             ];
             for srv in &srv_services {
                 let srv_name = format!("{}.{}", srv, target_base);
-                match resolver.srv_lookup(&srv_name).await {
-                    Ok(response) => {
-                        for record in response.iter() {
-                            let target_srv = record.target().to_string().trim_end_matches('.').to_string();
-                            let port_srv = record.port();
-                            let _ = tx.send(format!("[DNS Recon] SRV: {} → {}:{}", srv_name, target_srv, port_srv)).await;
-                            findings.push(
-                                Finding::new(
-                                    target,
-                                    "recon",
-                                    &format!("SRV Record: {} → {}:{}", srv, target_srv, port_srv),
-                                    &format!("DNS SRV record for {} resolves to {} on port {}.", srv_name, target_srv, port_srv),
-                                    Severity::Info,
-                                ).with_confidence(0.9)
-                                .with_evidence(vec![format!("SRV {} → {}:{}", srv_name, target_srv, port_srv)])
-                            );
-                        }
-                    }
-                    Err(_) => {}
-                }
-            }
-
-            // CAA (Certification Authority Authorization) records via generic lookup
-            match resolver.lookup(target_base, RecordType::CAA).await {
-                Ok(response) => {
-                    let caas: Vec<String> = response.iter()
-                        .map(|r| format!("{:?}", r))
-                        .collect();
-                    if !caas.is_empty() {
-                        let _ = tx.send(format!("[DNS Recon] CAA records: {}", caas.len())).await;
+                if let Ok(response) = resolver.srv_lookup(&srv_name).await {
+                    for record in response.iter() {
+                        let target_srv = record.target().to_string().trim_end_matches('.').to_string();
+                        let port_srv = record.port();
+                        let _ = tx.send(format!("[DNS Recon] SRV: {} → {}:{}", srv_name, target_srv, port_srv)).await;
                         findings.push(
                             Finding::new(
                                 target,
                                 "recon",
-                                "CAA (Certification Authority) Records",
-                                &format!("Found {} CAA records for {}. Limits which CAs can issue certificates.", caas.len(), target_base),
+                                &format!("SRV Record: {} → {}:{}", srv, target_srv, port_srv),
+                                &format!("DNS SRV record for {} resolves to {} on port {}.", srv_name, target_srv, port_srv),
                                 Severity::Info,
                             ).with_confidence(0.9)
-                            .with_evidence(caas)
+                            .with_evidence(vec![format!("SRV {} → {}:{}", srv_name, target_srv, port_srv)])
                         );
                     }
                 }
-                Err(_) => {}
+            }
+
+            // CAA (Certification Authority Authorization) records via generic lookup
+            if let Ok(response) = resolver.lookup(target_base, RecordType::CAA).await {
+                let caas: Vec<String> = response.iter()
+                    .map(|r| format!("{:?}", r))
+                    .collect();
+                if !caas.is_empty() {
+                    let _ = tx.send(format!("[DNS Recon] CAA records: {}", caas.len())).await;
+                    findings.push(
+                        Finding::new(
+                            target,
+                            "recon",
+                            "CAA (Certification Authority) Records",
+                            &format!("Found {} CAA records for {}. Limits which CAs can issue certificates.", caas.len(), target_base),
+                            Severity::Info,
+                        ).with_confidence(0.9)
+                        .with_evidence(caas)
+                    );
+                }
             }
 
             // DNSSEC status check via DNSKEY lookup

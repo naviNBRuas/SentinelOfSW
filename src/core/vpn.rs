@@ -236,14 +236,13 @@ impl VpnManager {
                     break;
                 }
                 let current = status.lock().await.clone();
-                if matches!(current, VpnStatus::Connected { .. }) {
-                    if !check_vpn_connectivity().await {
-                        let mut s = status.lock().await;
-                        *s = VpnStatus::Failed {
-                            error: "VPN connection lost".into(),
-                        };
-                        break;
-                    }
+                if matches!(current, VpnStatus::Connected { .. })
+                    && !check_vpn_connectivity().await {
+                    let mut s = status.lock().await;
+                    *s = VpnStatus::Failed {
+                        error: "VPN connection lost".into(),
+                    };
+                    break;
                 }
                 sleep(Duration::from_secs(5)).await;
             }

@@ -94,9 +94,9 @@ impl Module for WebEnum {
         let mut findings = Vec::new();
         let client = Arc::new(build_client());
 
-        let dirs = Settings::global().directory_wordlist(&DIR_WORDLIST)
+        let dirs = Settings::global().directory_wordlist(DIR_WORDLIST)
             .unwrap_or_else(|_| DIR_WORDLIST.iter().map(|s| s.to_string()).collect());
-        let ctf_files = Settings::global().ctf_file_wordlist(&CTF_FILES)
+        let ctf_files = Settings::global().ctf_file_wordlist(CTF_FILES)
             .unwrap_or_else(|_| CTF_FILES.iter().map(|s| s.to_string()).collect());
 
         let web_services: Vec<String> = if target.starts_with("http") {
@@ -270,7 +270,7 @@ impl Module for WebEnum {
                     let upgrade = resp.headers().get("upgrade").and_then(|v| v.to_str().ok());
                     let connection = resp.headers().get("connection").and_then(|v| v.to_str().ok());
                     if let Some(upg) = upgrade {
-                        if upg.to_lowercase() == "websocket" || connection.map_or(false, |c| c.to_lowercase().contains("upgrade")) {
+                        if upg.to_lowercase() == "websocket" || connection.is_some_and(|c| c.to_lowercase().contains("upgrade")) {
                             let _ = tx.send(format!("[Web Enum] WebSocket supported at {}", service_base)).await;
                             findings.push(
                                 Finding::new(target, "web", "WebSocket Endpoint Detected",
@@ -493,8 +493,7 @@ impl Module for WebEnum {
                             }
                         }
 
-                        let sev = if !found_flags.is_empty() { Severity::Critical }
-                                  else if file.contains("flag") || file.contains("shell") { Severity::Critical }
+                        let sev = if !found_flags.is_empty() || file.contains("flag") || file.contains("shell") { Severity::Critical }
                                   else if file.contains("config") || file.contains("backup") || file.contains(".git") { Severity::High }
                                   else { Severity::Medium };
                         if found_flags.is_empty() {

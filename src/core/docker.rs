@@ -181,18 +181,15 @@ apt-get update -qq 2>&1 | tail -3
             let result = Command::new("docker")
                 .args(["exec", &self.container_name, "bash", "-c", &cmd])
                 .output().await;
-            match result {
-                Ok(output) => {
-                    let out = String::from_utf8_lossy(&output.stdout);
-                    let tail: Vec<&str> = out.lines().rev().take(2).collect::<Vec<_>>().into_iter().rev().collect();
-                    for line in tail {
-                        let t = line.trim();
-                        if !t.is_empty() {
-                            let _ = send(t);
-                        }
+            if let Ok(output) = result {
+                let out = String::from_utf8_lossy(&output.stdout);
+                let tail: Vec<&str> = out.lines().rev().take(2).collect::<Vec<_>>().into_iter().rev().collect();
+                for line in tail {
+                    let t = line.trim();
+                    if !t.is_empty() {
+                        send(t);
                     }
                 }
-                Err(_) => {}
             }
         }
 

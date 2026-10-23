@@ -293,7 +293,7 @@ async fn check_smtp(stream: &mut TcpStream, user: &str, pass: &str) -> bool {
 
     if !resp.contains("250") { return false; }
     if resp.contains("AUTH") || resp.contains("auth") {
-        let auth_cmd = format!("AUTH LOGIN\r\n");
+        let auth_cmd = "AUTH LOGIN\r\n".to_string();
         let _ = stream.write_all(auth_cmd.as_bytes()).await.ok();
         buf.fill(0);
         let _ = timeout(Settings::global().banner_timeout(), stream.read(&mut buf)).await.ok();
@@ -509,7 +509,7 @@ async fn check_mysql_raw(stream: &mut TcpStream, user: &str, pass: &str) -> bool
             hasher.update(pass.as_bytes());
             let pass_hash = hasher.finalize_reset();
 
-            hasher.update(&pass_hash);
+            hasher.update(pass_hash);
             hasher.finalize_reset();
 
             hasher.update(&salt1[..8]);
